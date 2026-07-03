@@ -7,7 +7,7 @@ safety rubber, sand, asphalt, etc.), then builds and renders a solid 3D
 model of the whole layout in Blender — all driven from a desktop GUI.
 
 <!-- Drop a screenshot or GIF of the GUI / rendered output here, e.g.: -->
-![screenshot](desktop/Screenshot 2026-07-03 at 23.07.53.png) -->
+![screenshot](docs/screenshot.png)
 
 ## Pipeline
 
