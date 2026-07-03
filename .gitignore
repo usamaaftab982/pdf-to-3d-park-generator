@@ -1,0 +1,7 @@
+.env
+__pycache__/
+*.pyc
+park_output.json
+park_scene.blend
+model_preview.png
+.DS_Store

@@ -1,0 +1,11 @@
+PyMuPDF>=1.24.0
+google-genai>=0.5.0
+python-dotenv>=1.0.0
+
+# Note: Blender is NOT a pip package. blender_JSON_to_3D.py must be run
+# through Blender's own bundled Python interpreter (invoked automatically
+# by UI.py via `blender --background --python blender_JSON_to_3D.py`).
+# Install Blender separately: https://www.blender.org/download/
+# Copy this file to .env and fill in your key.
+# Get a free key at https://aistudio.google.com/apikey
+#GEMINI_API_KEY=your_api_key_here
