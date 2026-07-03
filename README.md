@@ -1,78 +1,113 @@
-# AI-work-Case-1-AI-Assisted-3D-Visualization-for-landscape-planning
+# PDF → 3D Park Generator
 
-**Note:** This project is not finished and some features are incomplete.
+Turns a 2D playground/park architectural PDF into a rendered 3D scene. The
+pipeline parses filled surfaces and equipment markers out of the PDF, uses
+Google Gemini to classify each surface into a real-world material (grass,
+safety rubber, sand, asphalt, etc.), then builds and renders a solid 3D
+model of the whole layout in Blender — all driven from a desktop GUI.
 
-## Description
+<!-- Drop a screenshot or GIF of the GUI / rendered output here, e.g.: -->
+![screenshot](desktop/Screenshot 2026-07-03 at 23.07.53.png) -->
 
-A prototype tool that converts 2D green construction plans to 3D representation in Blender.
+## Pipeline
 
-## Project overview
+```
+PDF  →  [1] Extract  →  [2] AI Classify  →  [3] Build 3D  →  [4] Render/Preview
+                              (Gemini)          (Blender)
+```
 
-Goal is to make design discussions, option comparisons and customer communication easier with the stakeholders with 3D rendering rather than relying only on 2D plan drawings.
+| Stage | File | What it does |
+|---|---|---|
+| 1. Extract | `src/pdf_extractor.py` | Parses the PDF with PyMuPDF: pulls filled polygons as "surfaces" (color + area), vector strokes, and numbered equipment markers matched against the legend text. Writes `park_output.json`. |
+| 2. Enrich | `src/ai_enricher.py` | Sends each surface's color + area to Gemini for material classification (`grass_lush`, `safety_rubber_red`, `fine_sand`, …). Falls back to rule-based color heuristics if the API is unavailable or a call fails. |
+| 3. Build | `src/blender_JSON_to_3D.py` | Runs headless inside Blender. Turns each surface into a solidified, UV-unwrapped mesh with a procedural PBR material (noise-driven bump maps, a glossy mix shader for water), and vector strokes into beveled curves. |
+| 4. Render | (same file, optional flag) | Auto-frames the camera on the full scene, adds sun + fill lighting, and renders a lit preview PNG. |
+| GUI | `src/UI.py` | Tkinter front end: pick a PDF, toggle which stages run, watch a color-coded live log and progress bar, view analytics (material breakdown, surface/vector/equipment counts), and pop open the rendered preview. |
 
-## What it does
+## Project structure
 
-Pipeline includes 4 steps:
+```
+.
+├── README.md
+├── requirements.txt
+├── .env.example
+├── .gitignore
+└── src/
+    ├── UI.py                    # GUI entry point — run this
+    ├── pdf_extractor.py         # Stage 1
+    ├── ai_enricher.py           # Stage 2
+    └── blender_JSON_to_3D.py    # Stages 3–4 (runs inside Blender, not plain Python)
+```
 
-1. Extracting surfaces, vectors, and equipment from plan PDF to structured JSON file.
-2. Enriching detected surface colors and areas for more realistic material types using LLM (Gemini)
-3. Generating a 3D Blender scene from the JSON file
-4. Rendering a preview image
+Generated output (`park_output.json`, `park_scene.blend`, `model_preview.png`)
+is written to the project root and is git-ignored — it's a build artifact,
+not source.
 
-Output:
-- park_output.json (structured plan data)
-- park_scene.blend (3D scene from the 2D plan)
+## Setup
 
-## Technologies used
+Requires **Python 3.10+** and **Blender 4.x** (installed separately —
+Blender is not a pip package: [blender.org/download](https://www.blender.org/download/)).
 
-- Python
-    - PyMuPDF (fitz) for the PDF vector, fill and text extraction and converting to JSON
-    - Tkinter for GUI to run the pipeline
-    - python-dotenv for loading .env variables
-    - google-genai (Gemini API, model: gemini-3-flash-preview) for enriching the material
-- Blender (bpy) for generating 3D scene from JSON file.
-- Data format: JSON for structured text, blend for 3d Blender file
+```bash
+git clone https://github.com/usamaaftab982/pdf-to-3d-park-generator.git
+cd pdf-to-3d-park-generator
 
-## Installation instructions
-
-- Python 3.10+?
-- Bender 5.0
-- Gemini API key
-
-Install dependencies:
+python3 -m venv venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-Environment variables:
-Create .env file in the repository root with API key:
-GEMINI_API_KEY=YOUR_KEY_HERE
+cp .env.example .env
+# then edit .env and add your Gemini API key
+# (free at https://aistudio.google.com/apikey)
+```
 
-## Usage guide
+## Running
 
-Project can be run via UI with following steps:
+```bash
+python3 src/UI.py
+```
 
-1. Start the UI from the terminal: python UI.py
-2. In the UI:
-    - Click Browse PDF for selecting plan PDF (included in test folder)
-    - Set Blender Executable path. If Blender is in PATH, keep blender, otherwise set full path
-    - Select which steps to run:
-        - Step 1: Extract PDF data creates structured JSON file park_output.json
-        - Step 2: AI Material Enrichment adds material type to surfaces
-        - Step 3: Generate 3D Model creates 3D model park_scene.blend
-        - Step 4: Show Preview Image renders and opens model_preview.png
-3. Click RUN PROCESS for creating 3D model. Log Output shows progression of the process.
+1. **Browse…** to select a PDF.
+2. Confirm the **Blender executable** field points at your install (it
+   auto-detects common macOS/Linux/Windows paths, or set it manually).
+3. Toggle pipeline stages as needed — Step 4 (render preview) is optional.
+4. Click **▶ RUN PIPELINE** and watch the log / progress bar / analytics
+   panel update live.
 
-Outputs from the process:
-    - park_output.json
-    - park_scene.blend
-    - model_preview.png
+Or run each stage independently from the CLI:
 
-## Team contribution
+```bash
+python3 src/pdf_extractor.py          # writes park_output.json
+python3 src/ai_enricher.py            # enriches it in place
+blender --background --python src/blender_JSON_to_3D.py -- --render-preview
+```
 
-This project required a lot of reasearch work both for us to dive into the world of 3D and testing different models for possible solutions.
+## Notes / known limitations
 
-The work regarding research and testing was divided pretty equally with a small majority to Saku.
-In addition there was the implementation part in terms of code, instructions and documentation. Most of the code implementation pushed into git was done by Lassi and Saku had more input on the documentation side.
+- Spatial filters (`AREA_THRESHOLD`, `X_LIMIT`, `Y_LIMIT` in
+  `pdf_extractor.py`) are tuned for a specific PDF layout convention
+  (legend/title block in the bottom-right). Adjust these constants for
+  PDFs with a different layout.
+- AI classification needs an active Gemini API key and quota; without one,
+  the pipeline still completes using the rule-based color-heuristic
+  fallback, just with lower material accuracy.
+- Blender must run with `--background` (headless) for the GUI's
+  subprocess call to work reliably outside an interactive session.
+- On macOS, native Tkinter buttons (`tk.Button`) ignore custom `bg`/`fg`
+  colors under the Aqua theme — `UI.py` works around this with
+  `ttk.Button` + a `clam`-themed style.
 
-So overall the team contribution was roughly:
- - Lassi: Research, testing, documentation and Code
- - Saku: Research, testing and documentation
+## Possible next steps
+
+- Batch mode: process a folder of PDFs without the GUI.
+- Cache Gemini responses by surface color + area so re-runs on the same
+  PDF don't re-spend API calls.
+- Replace the single hardcoded `MODEL` constant in `ai_enricher.py` with
+  a small ordered fallback list, so a future model retirement degrades
+  gracefully instead of silently dropping to rule-based classification.
+- Unit tests for the color-heuristic fallback and the JSON schema passed
+  between pipeline stages.
+
+## Tech stack
+
+Python · PyMuPDF · Google Gemini API · Blender (Python API / `bpy`) · Tkinter
